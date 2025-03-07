@@ -45,6 +45,24 @@ class MyHomePage extends StatefulWidget {
 class _MyHomePageState extends State<MyHomePage> {
   String _message = "Select zip file exported from PipePipe";
 
+  Future<void> _createArchiveFromDirectory(Directory sourceDir, String fileName) async {
+    try {
+      final Directory? downloadsDir = await getDownloadsDirectory();
+      final zipFilePath = "${downloadsDir?.path}/$fileName";
+      final zipFile = File(zipFilePath);
+
+      ZipFile.createFromDirectory(
+        sourceDir: sourceDir,
+        zipFile: zipFile,
+        recurseSubDirs: true
+      );
+
+      print("Archive created at: $zipFilePath");
+    } catch (e) {
+      print("Error creating archive: $e");
+    }
+  }
+
   void _addZipFile() async {
     String message = "";
     final tempDir = await getTemporaryDirectory();
@@ -66,15 +84,6 @@ class _MyHomePageState extends State<MyHomePage> {
             zipFile: zipFile,
             destinationDir: destinationDir,
             onExtracting: (zipEntry, progress) {
-              print('progress: ${progress.toStringAsFixed(1)}%');
-              print('name: ${zipEntry.name}');
-              print('isDirectory: ${zipEntry.isDirectory}');
-              print(
-                  'modificationDate: ${zipEntry.modificationDate?.toLocal().toIso8601String()}');
-              print('uncompressedSize: ${zipEntry.uncompressedSize}');
-              print('compressedSize: ${zipEntry.compressedSize}');
-              print('compressionMethod: ${zipEntry.compressionMethod}');
-              print('crc: ${zipEntry.crc}');
               return ZipFileOperation.includeItem;
             }
           );
@@ -86,6 +95,8 @@ class _MyHomePageState extends State<MyHomePage> {
           for (var file in extractedFiles) {
             print(file.path.split('/').last);
           }
+
+          await _createArchiveFromDirectory(destinationDir, "NewPipe");
         } catch (e) {
           print(e);
         }

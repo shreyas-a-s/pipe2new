@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:flutter_archive/flutter_archive.dart';
 import 'package:file_picker/file_picker.dart';
 
@@ -46,6 +47,9 @@ class _MyHomePageState extends State<MyHomePage> {
 
   void _addZipFile() async {
     String message = "";
+    final tempDir = await getTemporaryDirectory();
+    final timestamp = DateTime.now().millisecondsSinceEpoch;
+    final destinationDir = Directory("${tempDir.path}/extracted-$timestamp");
     FilePickerResult? result = await FilePicker.platform.pickFiles(
       type: FileType.custom,
       allowedExtensions: ['zip'],
@@ -53,9 +57,38 @@ class _MyHomePageState extends State<MyHomePage> {
 
     if (result != null) {
       if (result.files.single.extension == 'zip') {
-        File file = File(result.files.single.path!);
+        File zipFile = File(result.files.single.path!);
         print(result.files.single.name);
         message = 'Selected file is: ${result.files.single.name}';
+
+        try {
+          await ZipFile.extractToDirectory(
+            zipFile: zipFile,
+            destinationDir: destinationDir,
+            onExtracting: (zipEntry, progress) {
+              print('progress: ${progress.toStringAsFixed(1)}%');
+              print('name: ${zipEntry.name}');
+              print('isDirectory: ${zipEntry.isDirectory}');
+              print(
+                  'modificationDate: ${zipEntry.modificationDate?.toLocal().toIso8601String()}');
+              print('uncompressedSize: ${zipEntry.uncompressedSize}');
+              print('compressedSize: ${zipEntry.compressedSize}');
+              print('compressionMethod: ${zipEntry.compressionMethod}');
+              print('crc: ${zipEntry.crc}');
+              return ZipFileOperation.includeItem;
+            }
+          );
+
+          final extractedFiles = destinationDir.listSync(recursive: true)
+            .whereType<File>()
+            .toList();
+
+          for (var file in extractedFiles) {
+            print(file.path.split('/').last);
+          }
+        } catch (e) {
+          print(e);
+        }
       } else {
         message = "You have selected ${result.files.single.extension}. Only zip files are allowed";
       }

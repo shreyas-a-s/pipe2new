@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:flutter_archive/flutter_archive.dart';
 import 'package:file_picker/file_picker.dart';
+import 'package:sqflite/sqflite.dart';
 
 void main() {
   runApp(const MyApp());
@@ -63,6 +64,16 @@ class _MyHomePageState extends State<MyHomePage> {
     }
   }
 
+  Future<void> _alterDatabase(String dbFile) async {
+    var db = await openDatabase(dbFile);
+    await db.transaction((txn) async {
+      await txn.execute('ALTER TABLE playlists RENAME COLUMN display_index TO is_thumbnail_permanent');
+      await txn.execute('UPDATE playlists SET is_thumbnail_permanent = 0');
+      await txn.execute('ALTER TABLE remote_playlists DROP COLUMN display_index');
+    });
+    await db.close();
+  }
+
   void _addZipFile() async {
     String message = "";
     final tempDir = await getTemporaryDirectory();
@@ -96,6 +107,8 @@ class _MyHomePageState extends State<MyHomePage> {
             print(file.path.split('/').last);
           }
 
+          final dbFile = "${destinationDir}/newpipe.db";
+          await _alterDatabase(dbFile);
           await _createArchiveFromDirectory(destinationDir, "NewPipe");
         } catch (e) {
           print(e);

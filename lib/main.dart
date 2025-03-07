@@ -65,13 +65,17 @@ class _MyHomePageState extends State<MyHomePage> {
   }
 
   Future<void> _alterDatabase(String dbFile) async {
-    var db = await openDatabase(dbFile);
-    await db.transaction((txn) async {
-      await txn.execute('ALTER TABLE playlists RENAME COLUMN display_index TO is_thumbnail_permanent');
-      await txn.execute('UPDATE playlists SET is_thumbnail_permanent = 0');
-      await txn.execute('ALTER TABLE remote_playlists DROP COLUMN display_index');
-    });
-    await db.close();
+    try {
+      var db = await openDatabase(dbFile);
+      await db.transaction((txn) async {
+        await txn.rawQuery("SELECT name FROM sqlite_master WHERE type='table';");
+        await txn.execute('UPDATE playlists SET is_thumbnail_permanent = 0');
+        await txn.execute('ALTER TABLE remote_playlists DROP COLUMN display_index');
+      });
+      await db.close();
+    } catch (e) {
+      print(e);
+    }
   }
 
   void _addZipFile() async {

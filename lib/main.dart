@@ -49,13 +49,13 @@ class _MyHomePageState extends State<MyHomePage> {
   Future<void> _createArchiveFromDirectory(Directory sourceDir, String fileName) async {
     try {
       final Directory? downloadsDir = await getDownloadsDirectory();
-      final zipFilePath = "${downloadsDir?.path}/$fileName";
+      final zipFilePath = "${downloadsDir?.path}/$fileName.zip";
       final zipFile = File(zipFilePath);
 
       ZipFile.createFromDirectory(
         sourceDir: sourceDir,
         zipFile: zipFile,
-        recurseSubDirs: true
+        recurseSubDirs: false
       );
 
       print("Archive created at: $zipFilePath");
@@ -68,8 +68,8 @@ class _MyHomePageState extends State<MyHomePage> {
     try {
       var db = await openDatabase(dbFile);
       await db.transaction((txn) async {
-        await txn.rawQuery("SELECT name FROM sqlite_master WHERE type='table';");
-        await txn.execute('UPDATE playlists SET is_thumbnail_permanent = 0');
+        await txn.execute('ALTER TABLE playlists RENAME COLUMN display_index TO is_thumbnail_permanent');
+        await txn.execute('UPDATE playlist SET is_thumbnail_permanent = 0');
         await txn.execute('ALTER TABLE remote_playlists DROP COLUMN display_index');
       });
       await db.close();
@@ -103,15 +103,12 @@ class _MyHomePageState extends State<MyHomePage> {
             }
           );
 
-          final extractedFiles = destinationDir.listSync(recursive: true)
-            .whereType<File>()
-            .toList();
-
-          for (var file in extractedFiles) {
-            print(file.path.split('/').last);
+          await for (var entity in
+              destinationDir.list(recursive: true, followLinks: false)) {
+            print(entity.path);
           }
 
-          final dbFile = "${destinationDir}/newpipe.db";
+          final dbFile = "$destinationDir/newpipe.db";
           await _alterDatabase(dbFile);
           await _createArchiveFromDirectory(destinationDir, "NewPipe");
         } catch (e) {

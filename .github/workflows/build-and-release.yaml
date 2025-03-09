@@ -17,12 +17,11 @@ jobs:
       - name: Set Up Flutter
         uses: subosito/flutter-action@v2
         with:
-          flutter-version-file: pubspec.yaml
           channel: 'stable'
+          flutter-version: 3.7.0
 
       - name: Install Dependencies
         run: flutter pub get
-
 
       - name: Build APK
         run: flutter build apk --release

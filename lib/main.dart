@@ -49,9 +49,13 @@ class _MyHomePageState extends State<MyHomePage> {
 
   Future<void> _createArchiveFromDirectory(Directory sourceDir, String fileName) async {
     try {
-      final Directory? tempDir = await getTemporaryDirectory();
-      final zipFilePath = "${tempDir?.path}/$fileName.zip";
-      final zipFile = File(zipFilePath);
+      String? selectedDirectory = await FilePicker.platform.getDirectoryPath();
+
+      if (selectedDirectory == null) {
+        final Directory? tempDir = await getTemporaryDirectory();
+        selectedDirectory = tempDir?.path;
+      }
+      final zipFile = File("${selectedDirectory}/NewPipe.zip");
       final newArchive = Archive();
 
       for (final file in sourceDir.listSync(recursive: true)) {
@@ -65,7 +69,7 @@ class _MyHomePageState extends State<MyHomePage> {
     final newZipBytes = ZipEncoder().encode(newArchive);
     await zipFile.writeAsBytes(newZipBytes!);
 
-      print("Archive created at: $zipFilePath");
+      print("Archive created at: ${selectedDirectory}/NewPipe.zip");
     } catch (e) {
       print("Error creating archive: $e");
     }

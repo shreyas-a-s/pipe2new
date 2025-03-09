@@ -19,8 +19,18 @@ class MyApp extends StatelessWidget {
       title: 'PipePipe 2 NewPipe',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.red),
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: Colors.red,
+          brightness: Brightness.light, // Ensures it's for light mode
+        ),
       ),
+      darkTheme: ThemeData(
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: Colors.red,
+          brightness: Brightness.dark, // Ensures it's for dark mode
+        ),
+      ),
+      themeMode: ThemeMode.system,
       home: const MyHomePage(title: 'PipePipe 2 NewPipe'),
     );
   }

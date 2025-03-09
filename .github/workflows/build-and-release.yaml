@@ -37,33 +37,26 @@ jobs:
           path: |
             build/app/outputs/flutter-apk/app-release.apk
 
-      - name: Extract version from pubspec.yaml
+      - name: Get latest release tag and increment minor version
         id: extract_version
         run: |
-          version=$(grep '^version: ' pubspec.yaml | cut -d ' ' -f 2 | tr -d '\r')
-          echo "VERSION=$version" >> $GITHUB_ENV
+          latest_tag=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0")
+          echo "Latest tag: $latest_tag"
 
-      - name: Check if Tag Exists
-        id: check_tag
-        run: |
-          if git rev-parse "v${{ env.VERSION }}" >/dev/null 2>&1; then
-            echo "TAG_EXISTS=true" >> $GITHUB_ENV
-          else
-            echo "TAG_EXISTS=false" >> $GITHUB_ENV
-          fi
+          IFS='.' read -r major minor patch <<< "$latest_tag"
 
-      - name: Modify Tag
-        if: env.TAG_EXISTS == 'true'
-        id: modify_tag
-        run: |
-          new_version="${{ env.VERSION }}-build-${{ github.run_number }}"
+          minor=$((minor + 1))
+          patch=0
+          new_version="$major.$minor.$patch"
+
+          echo "New version: $new_version"
           echo "VERSION=$new_version" >> $GITHUB_ENV
 
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: v${{ env.VERSION }}
-          name: Release v${{ env.VERSION }}
+          name: Release ${{ env.VERSION }}
           files: ./build/app/outputs/flutter-apk/app-release.apk
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

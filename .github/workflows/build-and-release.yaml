@@ -21,7 +21,9 @@ jobs:
           flutter-version: 3.7.0
 
       - name: Install Dependencies
-        run: flutter pub get
+        run: |
+          flutter upgrade
+          flutter pub get
 
       - name: Build APK
         run: flutter build apk --release

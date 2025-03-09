@@ -1,9 +1,10 @@
 import 'dart:io';
+import 'package:archive/archive.dart';
 import 'package:flutter/material.dart';
 import 'package:path_provider/path_provider.dart';
-import 'package:flutter_archive/flutter_archive.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:sqflite/sqflite.dart';
+import 'package:path/path.dart' as p;
 
 void main() {
   runApp(const MyApp());
@@ -48,15 +49,21 @@ class _MyHomePageState extends State<MyHomePage> {
 
   Future<void> _createArchiveFromDirectory(Directory sourceDir, String fileName) async {
     try {
-      final Directory? downloadsDir = await getDownloadsDirectory();
-      final zipFilePath = "${downloadsDir?.path}/$fileName.zip";
+      final Directory? tempDir = await getTemporaryDirectory();
+      final zipFilePath = "${tempDir?.path}/$fileName.zip";
       final zipFile = File(zipFilePath);
+      final newArchive = Archive();
 
-      ZipFile.createFromDirectory(
-        sourceDir: sourceDir,
-        zipFile: zipFile,
-        recurseSubDirs: false
-      );
+      for (final file in sourceDir.listSync(recursive: true)) {
+        if (file is File) {
+          final filename = p.basename(file.path);
+          final fileBytes = await file.readAsBytes();
+          newArchive.addFile(ArchiveFile(filename, fileBytes.length, fileBytes));
+        }
+      }
+
+    final newZipBytes = ZipEncoder().encode(newArchive);
+    await zipFile.writeAsBytes(newZipBytes!);
 
       print("Archive created at: $zipFilePath");
     } catch (e) {
@@ -64,9 +71,9 @@ class _MyHomePageState extends State<MyHomePage> {
     }
   }
 
-  Future<void> _alterDatabase(String dbFile) async {
+  Future<void> _alterDatabase(File dbFile) async {
     try {
-      var db = await openDatabase(dbFile);
+      var db = await openDatabase(dbFile.path);
       await db.transaction((txn) async {
         await txn.execute('ALTER TABLE playlists RENAME COLUMN display_index TO is_thumbnail_permanent');
         await txn.execute('UPDATE playlist SET is_thumbnail_permanent = 0');
@@ -95,21 +102,29 @@ class _MyHomePageState extends State<MyHomePage> {
         message = 'Selected file is: ${result.files.single.name}';
 
         try {
-          await ZipFile.extractToDirectory(
-            zipFile: zipFile,
-            destinationDir: destinationDir,
-            onExtracting: (zipEntry, progress) {
-              return ZipFileOperation.includeItem;
-            }
-          );
+          final bytes = await zipFile!.readAsBytes();
+          final archive = ZipDecoder().decodeBytes(bytes);
+          if (destinationDir.existsSync()) destinationDir.deleteSync(recursive: true);
+          destinationDir.createSync(recursive: true);
 
-          await for (var entity in
-              destinationDir.list(recursive: true, followLinks: false)) {
-            print(entity.path);
+          File? dbFile;
+
+          for (final file in archive.files) {
+            if (!file.isFile) continue;
+            final filePath = '${destinationDir.path}/${file.name}';
+            File(filePath).writeAsBytesSync(file.content as List<int>);
+
+            if (file.name == 'newpipe.db') {
+              dbFile = File(filePath);
+            }
           }
 
-          final dbFile = "$destinationDir/newpipe.db";
-          await _alterDatabase(dbFile);
+          if (dbFile != null) {
+            await _alterDatabase(dbFile);
+          } else {
+            print("newpipe.db not found in the zip!");
+          }
+
           await _createArchiveFromDirectory(destinationDir, "NewPipe");
         } catch (e) {
           print(e);

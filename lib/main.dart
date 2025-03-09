@@ -65,7 +65,6 @@ class _MyHomePageState extends State<MyHomePage> {
     if (result != null) {
       if (result.files.single.extension == 'zip') {
         File zipFile = File(result.files.single.path!);
-        print(result.files.single.name);
         message = 'Selected file is: ${result.files.single.name}';
 
         try {
@@ -130,9 +129,9 @@ class _MyHomePageState extends State<MyHomePage> {
   }
 
   Future<void> _saveFile() async {
-    print("ZZZZ");
+    String message = "";
+
     if (_extractedDir == null) return;
-    print("XXXX");
 
     try {
       String? selectedDirectory = await FilePicker.platform.getDirectoryPath();
@@ -141,7 +140,8 @@ class _MyHomePageState extends State<MyHomePage> {
         final Directory? tempDir = await getTemporaryDirectory();
         selectedDirectory = tempDir?.path;
       }
-      final zipFile = File("${selectedDirectory}/NewPipe.zip");
+      final timestamp = DateTime.now().millisecondsSinceEpoch;
+      final zipFile = File("${selectedDirectory}/NewPipe-$timestamp.zip");
       final newArchive = Archive();
 
       for (final file in _extractedDir!.listSync(recursive: true)) {
@@ -154,12 +154,17 @@ class _MyHomePageState extends State<MyHomePage> {
 
       final newZipBytes = ZipEncoder().encode(newArchive);
       final result = await zipFile.writeAsBytes(newZipBytes!);
-      print(result);
 
-      print("Archive created at: ${selectedDirectory}/NewPipe.zip");
+      print("Archive created at: ${result.path}");
+      message = "Archive created at: ${result.path}";
     } catch (e) {
       print("Error creating archive: $e");
+      message = "Error creating archive!";
     }
+
+    setState(() {
+      _saveMessage = message;
+    });
   }
 
   @override

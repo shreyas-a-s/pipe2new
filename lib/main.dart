@@ -36,55 +36,17 @@ class MyHomePage extends StatefulWidget {
 }
 
 class _MyHomePageState extends State<MyHomePage> {
-  String _message = "Select zip file exported from PipePipe";
+  File? _dbFile;
+  Directory? _extractedDir;
+  String _selectMessage = "";
+  String _convertMessage = "";
+  String _saveMessage = "";
 
-  Future<void> _createArchiveFromDirectory(Directory sourceDir, String fileName) async {
-    try {
-      String? selectedDirectory = await FilePicker.platform.getDirectoryPath();
-
-      if (selectedDirectory == null) {
-        final Directory? tempDir = await getTemporaryDirectory();
-        selectedDirectory = tempDir?.path;
-      }
-      final zipFile = File("${selectedDirectory}/NewPipe.zip");
-      final newArchive = Archive();
-
-      for (final file in sourceDir.listSync(recursive: true)) {
-        if (file is File) {
-          final filename = p.basename(file.path);
-          final fileBytes = await file.readAsBytes();
-          newArchive.addFile(ArchiveFile(filename, fileBytes.length, fileBytes));
-        }
-      }
-
-    final newZipBytes = ZipEncoder().encode(newArchive);
-    await zipFile.writeAsBytes(newZipBytes!);
-
-      print("Archive created at: ${selectedDirectory}/NewPipe.zip");
-    } catch (e) {
-      print("Error creating archive: $e");
-    }
-  }
-
-  Future<void> _alterDatabase(File dbFile) async {
-    try {
-      var db = await openDatabase(dbFile.path);
-      await db.transaction((txn) async {
-        await txn.execute('ALTER TABLE playlists RENAME COLUMN display_index TO is_thumbnail_permanent');
-        await txn.execute('UPDATE playlists SET is_thumbnail_permanent = 0');
-        await txn.execute('ALTER TABLE remote_playlists DROP COLUMN display_index');
-      });
-      await db.close();
-    } catch (e) {
-      print(e);
-    }
-  }
-
-  void _addZipFile() async {
+  Future<void> _selectZipFile() async {
     String message = "";
     final tempDir = await getTemporaryDirectory();
     final timestamp = DateTime.now().millisecondsSinceEpoch;
-    final destinationDir = Directory("${tempDir.path}/extracted-$timestamp");
+    _extractedDir = Directory("${tempDir.path}/extracted-$timestamp");
     FilePickerResult? result = await FilePicker.platform.pickFiles(
       type: FileType.custom,
       allowedExtensions: ['zip'],
@@ -99,14 +61,14 @@ class _MyHomePageState extends State<MyHomePage> {
         try {
           final bytes = await zipFile!.readAsBytes();
           final archive = ZipDecoder().decodeBytes(bytes);
-          if (destinationDir.existsSync()) destinationDir.deleteSync(recursive: true);
-          destinationDir.createSync(recursive: true);
+          if (_extractedDir!.existsSync()) _extractedDir!.deleteSync(recursive: true);
+          _extractedDir!.createSync(recursive: true);
 
           File? dbFile;
 
           for (final file in archive.files) {
             if (!file.isFile) continue;
-            final filePath = '${destinationDir.path}/${file.name}';
+            final filePath = '${_extractedDir!.path}/${file.name}';
             File(filePath).writeAsBytesSync(file.content as List<int>);
 
             if (file.name == 'newpipe.db') {
@@ -115,12 +77,10 @@ class _MyHomePageState extends State<MyHomePage> {
           }
 
           if (dbFile != null) {
-            await _alterDatabase(dbFile);
+            _dbFile = dbFile;
           } else {
-            print("newpipe.db not found in the zip!");
+            message = "newpipe.db not found in the zip!";
           }
-
-          await _createArchiveFromDirectory(destinationDir, "NewPipe");
         } catch (e) {
           print(e);
         }
@@ -132,8 +92,64 @@ class _MyHomePageState extends State<MyHomePage> {
     }
 
     setState(() {
-      _message = message;
+      _selectMessage = message;
     });
+  }
+
+  Future<void> _convertZipFile() async {
+    String message = "";
+    if (_dbFile != null) {
+      try {
+        var db = await openDatabase(_dbFile!.path);
+        await db.transaction((txn) async {
+          await txn.execute('ALTER TABLE playlists RENAME COLUMN display_index TO is_thumbnail_permanent');
+          await txn.execute('UPDATE playlists SET is_thumbnail_permanent = 0');
+          await txn.execute('ALTER TABLE remote_playlists DROP COLUMN display_index');
+        });
+        await db.close();
+        message = "Conversion successfull!";
+      } catch (e) {
+        print(e);
+        message = "Sorry, an error occurred!";
+      }
+    }
+
+    setState(() {
+      _convertMessage = message;
+    });
+  }
+
+  Future<void> _saveFile() async {
+    print("ZZZZ");
+    if (_extractedDir == null) return;
+    print("XXXX");
+
+    try {
+      String? selectedDirectory = await FilePicker.platform.getDirectoryPath();
+
+      if (selectedDirectory == null) {
+        final Directory? tempDir = await getTemporaryDirectory();
+        selectedDirectory = tempDir?.path;
+      }
+      final zipFile = File("${selectedDirectory}/NewPipe.zip");
+      final newArchive = Archive();
+
+      for (final file in _extractedDir!.listSync(recursive: true)) {
+        if (file is File) {
+          final filename = p.basename(file.path);
+          final fileBytes = await file.readAsBytes();
+          newArchive.addFile(ArchiveFile(filename, fileBytes.length, fileBytes));
+        }
+      }
+
+      final newZipBytes = ZipEncoder().encode(newArchive);
+      final result = await zipFile.writeAsBytes(newZipBytes!);
+      print(result);
+
+      print("Archive created at: ${selectedDirectory}/NewPipe.zip");
+    } catch (e) {
+      print("Error creating archive: $e");
+    }
   }
 
   @override
@@ -147,16 +163,32 @@ class _MyHomePageState extends State<MyHomePage> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: <Widget>[
-            Text(
-              '$_message'
+            ElevatedButton(
+              onPressed: _selectZipFile,
+              child: Text("Select Zip File"),
             ),
+            SizedBox(height: 8),
+            Text(_selectMessage),
+
+            SizedBox(height: 16),
+
+            ElevatedButton(
+              onPressed: _convertZipFile,
+              child: Text("Convert Zip File"),
+            ),
+            SizedBox(height: 8),
+            Text(_convertMessage),
+
+            SizedBox(height: 16),
+
+            ElevatedButton(
+              onPressed: _saveFile,
+              child: Text("Save File"),
+            ),
+            SizedBox(height: 8),
+            Text(_saveMessage),
           ],
         ),
-      ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: _addZipFile,
-        tooltip: 'Add PipePipe zip file',
-        child: const Icon(Icons.add),
       ),
     );
   }

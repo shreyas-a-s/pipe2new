@@ -76,7 +76,7 @@ class _MyHomePageState extends State<MyHomePage> {
       var db = await openDatabase(dbFile.path);
       await db.transaction((txn) async {
         await txn.execute('ALTER TABLE playlists RENAME COLUMN display_index TO is_thumbnail_permanent');
-        await txn.execute('UPDATE playlist SET is_thumbnail_permanent = 0');
+        await txn.execute('UPDATE playlists SET is_thumbnail_permanent = 0');
         await txn.execute('ALTER TABLE remote_playlists DROP COLUMN display_index');
       });
       await db.close();
